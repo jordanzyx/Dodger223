@@ -10,9 +10,7 @@ import spark.Request;
 import spark.Response;
 import spark.Route;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -87,6 +85,15 @@ public class Listener {
             return "";
         });
 
+        //Get spot
+        get("/api/spot",(((request, response) -> {
+            String json = request.body(); //get the json
+            Document doc = Document.parse(json); //create a quick doc
+            int score = doc.getInteger("score");
+            Document item = new Document("above",getSpotsAbove(score));
+            return item.toJson();
+        })));
+
         //Set up the get request
         get("/api/lb",((request, response) -> {
             String json = request.body(); //get the json
@@ -117,14 +124,36 @@ public class Listener {
             //Create a score to return
             Score score = new Score(usr,nameToScore.get(usr));
 
-            return new Gson().toJson(score);
+            return new Gson().toJson(score,Score.class);
         })));
     }
 
     private List<String> getTop10(){
         List<String> scores = new ArrayList<>(); //scores to return
+        TreeSet<Map.Entry<String,Integer>> set = new TreeSet<>(new Comparator<Map.Entry<String, Integer>>() {
+            @Override
+            public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
+                return Integer.compare(o1.getValue(),o2.getValue());
+            }
+        });
+        set.addAll(nameToScore.entrySet());
+        set.stream().limit(10).forEach(entry -> {
+            Score score = new Score(entry.getKey(),entry.getValue());
+            String json = new Gson().toJson(score,Score.class);
+            scores.add(json);
+        });
 
         return scores;
+    }
+
+    private int getSpotsAbove(int score){
+        int above = 0;
+
+        for (Map.Entry<String, Integer> entry : nameToScore.entrySet()){
+            if(entry.getValue() > score)above++;
+        }
+
+        return above;
     }
 
     /**
